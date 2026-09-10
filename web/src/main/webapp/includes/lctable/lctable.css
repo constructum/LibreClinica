@@ -222,6 +222,23 @@
 }
 
 /*
+ * Button-style action links (e.g., "Cancel Job" in the Actions column of ScheduledJobs view).
+ * Styled to match the legacy jmesa input[type="submit"].button appearance.
+ */
+.lctable a.button, .lctable a.button:link, .lctable a.button:visited {
+    display: inline-block;
+    text-align: center;
+    text-decoration: none;
+    color: #FFFFFF !important;
+    padding: 0;
+    line-height: 17px;
+}
+
+.lctable a.button:hover, .lctable a.button:active {
+    text-decoration: none;
+}
+
+/*
  * Every data cell is tagged by LCTableColumnDef with a "lc-col-<columnName>" class (see nullSafeCell()),
  * so that a specific column's cells can be targeted generically by CSS. The "actions" column (its
  * action-icon links, see ".action-link" above) is the one concrete case needed so far: keep all of a
