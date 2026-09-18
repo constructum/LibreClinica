@@ -1,7 +1,7 @@
 /*
  * LibreClinica is distributed under the
  * GNU Lesser General Public License (GNU LGPL).
-
+ *
  * For details see: https://libreclinica.org/license
  * copyright (C) 2026 LibreClinica
  *
@@ -16,6 +16,8 @@ import static org.akaza.openclinica.lctable.LCTableUtil.*;
 import htmlflow.HtmlFlow;
 import org.xmlet.htmlapifaster.*;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import javax.servlet.http.HttpServletRequest;
 
 import java.io.StringWriter;
 import java.text.MessageFormat;
@@ -351,6 +353,14 @@ public class LCTable<T>  {
     public String render(String entityPath, LCTableParams params, String resourcePath, Locale locale) {
         final LCTableContext<T> ctx = new LCTableContext<>(entityPath, params, fetchData, resourcePath, locale);
         return renderTableHtml(ctx);
+    }
+
+    /** Renders this table using state and paths taken directly from the current servlet request. */
+    public String render(HttpServletRequest request) {
+        Objects.requireNonNull(request, "request");
+        LCTableParams params = new LCTableParams(request.getQueryString(), this);
+        return render(request.getRequestURI(), params, request.getContextPath(),
+            org.akaza.openclinica.i18n.core.LocaleResolver.getLocale(request));
     }
 
     // -- Controls (pagination etc.) -------------------------------------------

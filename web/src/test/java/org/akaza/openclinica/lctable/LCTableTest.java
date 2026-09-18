@@ -1,5 +1,9 @@
 /*
- * LibreClinica is distributed under the GNU Lesser General Public License (GNU LGPL).
+ * LibreClinica is distributed under the
+ * GNU Lesser General Public License (GNU LGPL).
+
+ * For details see: https://libreclinica.org/license
+ * copyright (C) 2026 LibreClinica
  */
 package org.akaza.openclinica.lctable;
 
@@ -10,6 +14,7 @@ import org.akaza.openclinica.lctable.LCPopup.PopupItemLayout;
 import org.akaza.openclinica.lctable.LCPopup.PopupItemRenderer;
 import org.xmlet.htmlapifaster.Div;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -18,6 +23,7 @@ import java.util.Optional;
 import java.util.ResourceBundle;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import static org.akaza.openclinica.lctable.LCTableColumnDef.NOT_SORTABLE;
 import static org.akaza.openclinica.lctable.LCTableColumnDef.NO_FILTER;
@@ -218,6 +224,47 @@ public class LCTableTest extends TestCase {
 
         assertEquals(Optional.of("ACTIVE"), filter.parseParam("active"));
         assertEquals(Optional.empty(), filter.parseParam("Localized active"));
+    }
+
+    public void testRendersDirectlyFromRequestAndPreservesStickyParameter() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getQueryString()).thenReturn("scope=S-1&q.subject=M-001");
+        when(request.getRequestURI()).thenReturn("/Subjects");
+        when(request.getContextPath()).thenReturn("/LibreClinica");
+        when(request.getLocales()).thenReturn(Collections.enumeration(Collections.singletonList(Locale.ENGLISH)));
+        LCTable<Row> table = new LCTable<>(
+            "testTable",
+            List.of(textCol("subject", key("subject"), "subject", 0, row -> row.subject)),
+            params -> new LCTableData<>(List.of(new Row(params.filters.get("subject"), "Baseline")), 1),
+            List.of("scope")
+        );
+
+        String html = table.render(request);
+
+        assertTrue(html.contains("name=\"scope\" value=\"S-1\""));
+        assertTrue(html.contains("name=\"q.subject\" value=\"M-001\""));
+        assertTrue(html.contains("hx-get=\"/Subjects"));
+        assertTrue(html.contains("/LibreClinica/images/table/sortAsc.gif"));
+    }
+
+    public void testToolbarClearFilterPreservesStickyAndNonFilterState() {
+        LCTable<Row> table = new LCTable<>(
+            "testTable",
+            List.of(textCol("subject", key("subject"), "subject", 0, row -> row.subject)),
+            params -> new LCTableData<>(List.of(new Row("M-001", "Baseline")), 1),
+            List.of("scope")
+        );
+        table.addCustomToolbarControl(LCTableToolbarControls.clearFilter(table));
+        LCTableParams params = new LCTableParams(
+            0, 15, "subject", "desc", Collections.singletonMap("subject", "M"), false,
+            Collections.singletonMap("scope", "S-1"));
+
+        String html = table.render("/Subjects", params, "", Locale.ENGLISH);
+
+        assertTrue(html.contains("id=\"testTable-clear-filter-toolbar\""));
+        assertTrue(html.contains("data-test-action=\"clear-filter\""));
+        assertTrue(html.contains("hx-include=\"[name=page],[name=maxRows],[name=sortProp],[name=sortDir],[name=showHiddenCols],[name=scope]\""));
+        assertTrue(html.contains("Clear Filter"));
     }
 
     private static final class Row {

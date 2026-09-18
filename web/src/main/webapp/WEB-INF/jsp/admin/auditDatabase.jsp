@@ -29,6 +29,21 @@
         }
     </script>
 </c:if>
+<c:if test="${tableRenderingMode == 'htmlflow'}">
+    <%-- Audit Database is the only page where the generated LCTable form picks up visible
+         bottom box space. Keep this normalization page-scoped rather than changing every table. --%>
+    <style type="text/css">
+        #auditDatabaseDiv .lctable > form {
+            display: block;
+            margin: 0;
+            padding: 0;
+            line-height: 0;
+        }
+        #auditDatabaseDiv .lctable > form > table {
+            line-height: normal;
+        }
+    </style>
+</c:if>
 
 <fmt:setBundle basename="org.akaza.openclinica.i18n.words" var="resword"/>
 
