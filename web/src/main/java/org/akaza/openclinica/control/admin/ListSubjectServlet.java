@@ -52,23 +52,38 @@ public class ListSubjectServlet extends SecureController {
     @Override
     public void processRequest() throws Exception {
         SubjectDAO sdao = new SubjectDAO(sm.getDataSource());
-
         StudySubjectDAO subdao = new StudySubjectDAO(sm.getDataSource());
         StudyDAO studyDao = new StudyDAO(sm.getDataSource());
         UserAccountDAO uadao = new UserAccountDAO(sm.getDataSource());
 
-        ListSubjectTableFactory factory = new ListSubjectTableFactory();
-        factory.setSubjectDao(sdao);
-        factory.setStudySubjectDao(subdao);
-        factory.setUserAccountDao(uadao);
-        factory.setStudyDao(studyDao);
-        factory.setCurrentStudy(currentStudy);
+        String lcTableRendering = System.getenv("LC_TABLE_RENDERING");
+        if (lcTableRendering != null && lcTableRendering.equalsIgnoreCase("jmesa")) {
+            request.setAttribute("tableRenderingMode", "jmesa");
+            ListSubjectTableFactory factory = new ListSubjectTableFactory();
+            factory.setSubjectDao(sdao);
+            factory.setStudySubjectDao(subdao);
+            factory.setUserAccountDao(uadao);
+            factory.setStudyDao(studyDao);
+            factory.setCurrentStudy(currentStudy);
 
+            request.setAttribute("listSubjectsHtml", factory.createTable(request, response).render());
+            forwardPage(Page.SUBJECT_LIST);
+        } else {
+            request.setAttribute("tableRenderingMode", "htmlflow");
+            ListSubjectTable table = new ListSubjectTable(
+                sdao, subdao, uadao, studyDao, currentStudy, LocaleResolver.getLocale(request));
+            String listSubjectsHtml = table.render(request);
 
-        String auditLogsHtml = factory.createTable(request, response).render();
-        request.setAttribute("listSubjectsHtml", auditLogsHtml);
-
-        forwardPage(Page.SUBJECT_LIST);
+            response.addHeader("Vary", "HX-Request");
+            if (request.getHeader("HX-Request") != null) {
+                response.setContentType("text/html;charset=UTF-8");
+                response.getWriter().write(listSubjectsHtml);
+                response.getWriter().flush();
+            } else {
+                request.setAttribute("listSubjectsHtml", listSubjectsHtml);
+                forwardPage(Page.SUBJECT_LIST);
+            }
+        }
     }
 
     @Override

@@ -1,7 +1,7 @@
 /*
  * LibreClinica is distributed under the
  * GNU Lesser General Public License (GNU LGPL).
-
+ *
  * For details see: https://libreclinica.org/license
  * copyright (C) 2026 LibreClinica
  *
@@ -190,19 +190,22 @@ public abstract class LCTableFilterDef {
                 ",[name=" + LCTableParams.PARAM_SORT_DIR + "]" +
                 ",[name=" + LCTableParams.PARAM_SHOW_HIDDEN_COLS + "]";
 
-        @Override
-        public <T, E extends Element<?, ?>> void renderFilter(Tr<E> tr, LCTableContext<T> ctx, LCTableColumnDef<T> col, LCTable<T> table) {
+        static String selectorFor(LCTable<?> table) {
             StringBuilder selector = new StringBuilder(NON_FILTER_PARAMS_SELECTOR);
-            // Append the per-table "sticky" parameter names to the selector, to preserve them when clearing filters.
             for (String stickyParamName : table.getStickyParamNames()) {
                 selector.append(",[name=").append(stickyParamName).append(']');
             }
+            return selector.toString();
+        }
+
+        @Override
+        public <T, E extends Element<?, ?>> void renderFilter(Tr<E> tr, LCTableContext<T> ctx, LCTableColumnDef<T> col, LCTable<T> table) {
             tr.td().a()
                 .attrId(table.tableName + "-clear-filter-" + col.columnName)
                 .attrClass("text-btn")
                 .addAttr("data-testid", "clear-filter-button")
                 .addAttr("data-test-column", col.columnName)     // this refers to the column where the button appears, but the button clears all filters, not just that column
-                .of(hxGetAttrs(ctx.entityPath, selector.toString(), "#" + table.panelId, "click"))
+                .of(hxGetAttrs(ctx.entityPath, selectorFor(table), "#" + table.panelId, "click"))
                 .text(ctx.words.getString("table_clear_filter"))
                 .__().__();
         }

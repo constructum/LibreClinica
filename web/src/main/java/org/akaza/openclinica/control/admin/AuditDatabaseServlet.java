@@ -5,11 +5,16 @@
  * For details see: https://libreclinica.org/license
  * copyright (C) 2003 - 2011 Akaza Research
  * copyright (C) 2003 - 2019 OpenClinica
- * copyright (C) 2020 - 2024 LibreClinica
+ * copyright (C) 2020 - 2026 LibreClinica
  */
 package org.akaza.openclinica.control.admin;
 
 import static org.jmesa.facade.TableFacadeFactory.createTableFacade;
+import static org.akaza.openclinica.lctable.LCTableColumnDef.textCol;
+import static org.akaza.openclinica.lctable.LCTableFilterDef.textFilter;
+import static org.akaza.openclinica.lctable.LCTableText.key;
+import static org.akaza.openclinica.lctable.LCTableUtil.TIMESTAMP_FILTER_FOR_HTML_VALIDATION;
+import static org.akaza.openclinica.lctable.LCTableUtil.TIMESTAMP_FILTER_MESSAGE;
 
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +24,12 @@ import org.akaza.openclinica.control.core.SecureController;
 import org.akaza.openclinica.dao.hibernate.DatabaseChangeLogDao;
 import org.akaza.openclinica.domain.technicaladmin.DatabaseChangeLogBean;
 import org.akaza.openclinica.i18n.core.LocaleResolver;
+import org.akaza.openclinica.lctable.LCTable;
+import org.akaza.openclinica.lctable.LCTableColumnDef;
+import org.akaza.openclinica.lctable.LCTableInMemoryColumn;
+import org.akaza.openclinica.lctable.LCTableInMemoryDataSource;
+import org.akaza.openclinica.lctable.LCTableToolbarControls;
+import org.akaza.openclinica.lctable.LCTableUtil;
 import org.akaza.openclinica.view.Page;
 import org.akaza.openclinica.web.InsufficientPermissionException;
 import org.jmesa.facade.TableFacade;
@@ -35,6 +46,7 @@ import org.jmesa.view.html.component.HtmlTable;
 public class AuditDatabaseServlet extends SecureController {
 
     private static final long serialVersionUID = 1L;
+    private static final String TABLE_NAME = "databaseChangeLogs";
 
     // < ResourceBundle restext;
     Locale locale;
@@ -60,10 +72,59 @@ public class AuditDatabaseServlet extends SecureController {
 
     @Override
     protected void processRequest() throws Exception {
-        String auditDatabaseHtml = renderAuditDatabaseTable(getDatabaseChangeLogDao().findAll());
-        request.setAttribute("auditDatabaseHtml", auditDatabaseHtml);
-        forwardPage(Page.AUDIT_DATABASE);
+        List<DatabaseChangeLogBean> databaseChangeLogs = getDatabaseChangeLogDao().findAll();
+        String lcTableRendering = System.getenv("LC_TABLE_RENDERING");
+        if (lcTableRendering != null && lcTableRendering.equalsIgnoreCase("jmesa")) {
+            request.setAttribute("tableRenderingMode", "jmesa");
+            request.setAttribute("auditDatabaseHtml", renderAuditDatabaseTable(databaseChangeLogs));
+            forwardPage(Page.AUDIT_DATABASE);
+        } else {
+            request.setAttribute("tableRenderingMode", "htmlflow");
+            String auditDatabaseHtml = renderAuditDatabaseLCTable(databaseChangeLogs);
+            response.addHeader("Vary", "HX-Request");
+            if (request.getHeader("HX-Request") != null) {
+                response.setContentType("text/html;charset=UTF-8");
+                response.getWriter().write(auditDatabaseHtml);
+                response.getWriter().flush();
+            } else {
+                request.setAttribute("auditDatabaseHtml", auditDatabaseHtml);
+                forwardPage(Page.AUDIT_DATABASE);
+            }
+        }
 
+    }
+
+    String renderAuditDatabaseLCTable(List<DatabaseChangeLogBean> databaseChangeLogs) {
+        List<LCTableColumnDef<DatabaseChangeLogBean>> columns = List.of(
+            textCol("id",           key("Id"),            "id",            0, DatabaseChangeLogBean::getId),
+            textCol("author",       key("author"),        "author",        0, DatabaseChangeLogBean::getAuthor),
+            textCol("fileName",     key("file_name"),     "file-name",     0, DatabaseChangeLogBean::getFileName),
+            textCol("dataExecuted", key("date_executed"), "date-executed", 0,
+                textFilter(TIMESTAMP_FILTER_FOR_HTML_VALIDATION, TIMESTAMP_FILTER_MESSAGE),
+                DatabaseChangeLogBean::getDataExecuted, LCTableUtil::timestampToString),
+            textCol("md5Sum",       key("md5_sum"),       "md5-sum",       0, DatabaseChangeLogBean::getMd5Sum),
+            textCol("description",  key("description"),   "description",   0, DatabaseChangeLogBean::getDescription),
+            textCol("comments",     key("comments"),      "comments",      0, DatabaseChangeLogBean::getComments),
+            textCol("tag",          key("tag"),           "tag",           0, DatabaseChangeLogBean::getTag),
+            textCol("liquibase",    key("liquibase"),     "liquibase",     0, DatabaseChangeLogBean::getLiquibase)
+        );
+        LCTableInMemoryDataSource<DatabaseChangeLogBean> dataSource = new LCTableInMemoryDataSource<>(
+            databaseChangeLogs,
+            List.of(
+                LCTableInMemoryColumn.text("id", DatabaseChangeLogBean::getId),
+                LCTableInMemoryColumn.text("author", DatabaseChangeLogBean::getAuthor),
+                LCTableInMemoryColumn.text("fileName", DatabaseChangeLogBean::getFileName),
+                LCTableInMemoryColumn.value("dataExecuted", DatabaseChangeLogBean::getDataExecuted, LCTableUtil::timestampToString),
+                LCTableInMemoryColumn.text("md5Sum", DatabaseChangeLogBean::getMd5Sum),
+                LCTableInMemoryColumn.text("description", DatabaseChangeLogBean::getDescription),
+                LCTableInMemoryColumn.text("comments", DatabaseChangeLogBean::getComments),
+                LCTableInMemoryColumn.text("tag", DatabaseChangeLogBean::getTag),
+                LCTableInMemoryColumn.text("liquibase", DatabaseChangeLogBean::getLiquibase)
+            )
+        );
+        LCTable<DatabaseChangeLogBean> table = new LCTable<>(TABLE_NAME, columns, dataSource);
+        table.addCustomToolbarControl(LCTableToolbarControls.clearFilter(table));
+        return table.render(request);
     }
 
     private String renderAuditDatabaseTable(List<DatabaseChangeLogBean> databaseChangeLogs) {
